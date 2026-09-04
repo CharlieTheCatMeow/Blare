@@ -24,7 +24,7 @@ void setup() {
 
   tft.setTextSize(6);
 
-  tft.print("E");
+  tft.print("Thing");
 }
 
 void loop() {
