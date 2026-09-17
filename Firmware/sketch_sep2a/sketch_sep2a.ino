@@ -14,18 +14,22 @@
 #define SWITCH_PIN_3 2
 #define SWITCH_PIN_4 3
 
+#define BUZZER_PIN 7
+
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
 void setup() {
-  Serial.begin(115200)
+  Serial.begin(115200);
 
   pinMode(SWITCH_PIN_1, INPUT_PULLUP);
   pinMode(SWITCH_PIN_2, INPUT_PULLUP);
   pinMode(SWITCH_PIN_3, INPUT_PULLUP);
   pinMode(SWITCH_PIN_4, INPUT_PULLUP);
 
+  pinMode(BUZZER_PIN, OUTPUT);
+
   tft.init(76, 284); // Our panel size (portrait)
-  tft.setOffsets(82, 18); // Offsets for the weird resolution
+  //tft.setOffsets(82, 18); // Offsets for the weird resolution
   tft.invertDisplay(false); // Invert the colors (This display is flipped from normal)
   tft.setRotation(1); // Landscape, if it's upside down use 3!
   tft.fillScreen(ST77XX_BLACK); // clear the screen
@@ -45,26 +49,32 @@ void loop() {
 
   if (switch1State == LOW) {
     tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0)
-    tft.print("Switch 1 works")
+    tft.setCursor(0, 0);
+    tft.print("Switch 1 works");
+    tone(BUZZER_PIN, 1000);
+    delay(200);
+    noTone(BUZZER_PIN);
+  }
+  else if (switch1State == LOW) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setCursor(0, 0);
+    tft.print("Switch 2 works");
+    tone(BUZZER_PIN, 500);
+    delay(500);
+    tone(BUZZER_PIN, 1000);
+    delay(200);
+    noTone(BUZZER_PIN);
+  }
+  else if (switch1State == LOW) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setCursor(0, 0);
+    tft.print("Switch 3 works");
     delay(200);
   }
   else if (switch1State == LOW) {
     tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0)
-    tft.print("Switch 2 works")
-    delay(200);
-  }
-  else if (switch1State == LOW) {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0)
-    tft.print("Switch 3 works")
-    delay(200);
-  }
-  else if (switch1State == LOW) {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0)
-    tft.print("Switch 4 works")
+    tft.setCursor(0, 0);
+    tft.print("Switch 4 works");
     delay(200);
   }
 }
