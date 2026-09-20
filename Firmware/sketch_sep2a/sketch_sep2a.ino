@@ -70,6 +70,13 @@ void loop() {
     tft.setCursor(0, 0);
     tft.print("Switch 3 works");
     delay(200);
+    for (int i = 0; i < 5; i++) {
+      tft.fillScreen(ST77XX_BLACK);
+      tft.print("Iteration " + String(i));
+      tone(BUZZER_PIN, 200 * i);
+      delay(300);
+      noTone(BUZZER_PIN);
+    }
   }
   else if (switch1State == LOW) {
     tft.fillScreen(ST77XX_BLACK);
