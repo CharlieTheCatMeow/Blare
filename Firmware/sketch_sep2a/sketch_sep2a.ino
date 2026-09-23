@@ -55,7 +55,7 @@ void loop() {
     delay(200);
     noTone(BUZZER_PIN);
   }
-  else if (switch1State == LOW) {
+  else if (switch2State == LOW) {
     tft.fillScreen(ST77XX_BLACK);
     tft.setCursor(0, 0);
     tft.print("Switch 2 works");
@@ -65,7 +65,7 @@ void loop() {
     delay(200);
     noTone(BUZZER_PIN);
   }
-  else if (switch1State == LOW) {
+  else if (switch3State == LOW) {
     tft.fillScreen(ST77XX_BLACK);
     tft.setCursor(0, 0);
     tft.print("Switch 3 works");
@@ -78,10 +78,16 @@ void loop() {
       noTone(BUZZER_PIN);
     }
   }
-  else if (switch1State == LOW) {
+  else if (switch4State == LOW) {
     tft.fillScreen(ST77XX_BLACK);
     tft.setCursor(0, 0);
     tft.print("Switch 4 works");
     delay(200);
+    if (switch1State == LOW && switch4State == LOW) {
+      tft.fillScreen(ST77XX_BLACK);
+      tft.print("Hi");
+      tone(BUZZER_PIN, 500);
+      delay(300);
+    }
   }
 }
