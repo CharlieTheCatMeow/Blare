@@ -2,42 +2,61 @@
 #include <Adafruit_ST7789.h>
 #include <SPI.h>
 
-#define TFT_SCLK 9
-#define TFT_MOSI 10
-#define TFT_RST 8
-#define TFT_DC 4
-#define TFT_CS 5
-#define TFT_BL 6
+#define TFT_SCLK 9    
+#define TFT_MOSI 10   // SDA
+#define TFT_RST  8 
+#define TFT_DC   6    
+#define TFT_CS   7    
+#define TFT_BL   21   
 
-#define SWITCH_PIN_1 0
-#define SWITCH_PIN_2 1
-#define SWITCH_PIN_3 2
-#define SWITCH_PIN_4 3
+#define SWITCH_PIN_1 2   
+#define SWITCH_PIN_2 3   
+#define SWITCH_PIN_3 4   
+#define SWITCH_PIN_4 5   
 
-#define BUZZER_PIN 7
+#define BUZZER_PIN 20    
 
-Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+class Panel : public Adafruit_ST7789 {
+public:
+  using Adafruit_ST7789::Adafruit_ST7789;
+  void setOffsets(int8_t col, int8_t row) { setColRowStart(col, row); }
+};
+
+// High-speed Hardware SPI
+Panel tft = Panel(&SPI, TFT_CS, TFT_DC, TFT_RST);
+
+int lastState[4] = {HIGH, HIGH, HIGH, HIGH};
 
 void setup() {
   Serial.begin(115200);
+  delay(2000);
+  Serial.println("Booting...");
 
   pinMode(SWITCH_PIN_1, INPUT_PULLUP);
   pinMode(SWITCH_PIN_2, INPUT_PULLUP);
   pinMode(SWITCH_PIN_3, INPUT_PULLUP);
   pinMode(SWITCH_PIN_4, INPUT_PULLUP);
-
+  
   pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(TFT_BL, OUTPUT);
+  
+  // CRITICAL FIX: Pull to GND to activate the backlight LEDs
+  digitalWrite(TFT_BL, LOW);
 
-  tft.init(76, 284); // Our panel size (portrait)
-  //tft.setOffsets(82, 18); // Offsets for the weird resolution
-  tft.invertDisplay(false); // Invert the colors (This display is flipped from normal)
-  tft.setRotation(1); // Landscape, if it's upside down use 3!
-  tft.fillScreen(ST77XX_BLACK); // clear the screen
+  // Pass -1 for CS so the Adafruit library can control it manually
+  SPI.begin(TFT_SCLK, -1, TFT_MOSI, -1);
+
+  // Initialize display
+  tft.init(76, 284); 
+  tft.setOffsets(82, 18); 
+  tft.invertDisplay(false); 
+  tft.setRotation(1); 
+  tft.fillScreen(ST77XX_BLACK); 
   Serial.println("TFT Initialized!");
-  tft.setCursor(0,0); // make the cursor at the top left
-
-  tft.setTextSize(6);
-
+  
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setTextSize(3);         
+  tft.setCursor(0, 0);
   tft.print("Thing");
 }
 
@@ -47,7 +66,23 @@ void loop() {
   int switch3State = digitalRead(SWITCH_PIN_3);
   int switch4State = digitalRead(SWITCH_PIN_4);
 
-  if (switch1State == LOW) {
+  int states[4] = {switch1State, switch2State, switch3State, switch4State};
+  for (int i = 0; i < 4; i++) {
+    if (states[i] != lastState[i]) {
+      Serial.printf("Switch %d %s\n", i + 1, states[i] == LOW ? "PRESSED" : "released");
+      lastState[i] = states[i];
+    }
+  }
+
+  if (switch1State == LOW && switch4State == LOW) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setCursor(0, 0);
+    tft.print("Hi");
+    tone(BUZZER_PIN, 500);
+    delay(300);
+    noTone(BUZZER_PIN);
+  }
+  else if (switch1State == LOW) {
     tft.fillScreen(ST77XX_BLACK);
     tft.setCursor(0, 0);
     tft.print("Switch 1 works");
@@ -71,9 +106,11 @@ void loop() {
     tft.print("Switch 3 works");
     delay(200);
     for (int i = 0; i < 5; i++) {
-      tft.fillScreen(ST77XX_BLACK);
+      tft.fillScreen(ST77XX_RED);
+      tft.setCursor(0, 0);
       tft.print("Iteration " + String(i));
-      tone(BUZZER_PIN, 200 * i);
+      // Syntax error corrected here:
+      tone(BUZZER_PIN, 200 * i + 200); 
       delay(300);
       noTone(BUZZER_PIN);
     }
@@ -83,11 +120,5 @@ void loop() {
     tft.setCursor(0, 0);
     tft.print("Switch 4 works");
     delay(200);
-    if (switch1State == LOW && switch4State == LOW) {
-      tft.fillScreen(ST77XX_BLACK);
-      tft.print("Hi");
-      tone(BUZZER_PIN, 500);
-      delay(300);
-    }
   }
 }
