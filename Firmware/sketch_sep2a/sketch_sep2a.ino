@@ -25,17 +25,203 @@ public:
 // High-speed Hardware SPI
 Panel tft = Panel(&SPI, TFT_CS, TFT_DC, TFT_RST);
 
-int lastState[4] = {HIGH, HIGH, HIGH, HIGH};
+const int BTN_MODE = 0;
+const int BTN_SET = 1;
+const int BTN_UP = 2;
+const int BTN_DOWN = 3;
+
+const uint8_t BUTTON_PINS[4] = {SWITCH_PIN_1, SWITCH_PIN_2, SWITCH_PIN_3, SWITCH_PIN_4};
+const unsigned long DEBOUNCE_MS = 30;
+
+bool rawState[4] = {false, false, false, false};
+bool stableState[4] = {false, false, false, false};
+unsigned long lastChangeMs[4] = {0, 0, 0, 0};
+bool pressedEvent[4] = {false, false, false, false};
+
+bool beepActive = false;
+unsigned long beepEndMs = 0;
+
+void beep(int frequency, int durationMs) {
+  tone(BUZZER_PIN, frequency);
+  beepActive = true;
+  beepEndMs = millis() + durationMs;
+}
+
+void updateBeep() {
+  if (beepActive && millis() >= beepEndMs) {
+    noTone(BUZZER_PIN);
+    beepActive = false;
+  }
+}
+
+int hours = 12;
+int minutes = 0;
+int seconds = 0;
+unsigned long lastTickMs = 0;
+
+enum AppMode { MODE_CLOCK, MODE_SET_TIME };
+AppMode currentMode = MODE_CLOCK;
+
+int editHours = 0;
+int editMinutes = 0;
+int editField = 0;
+
+bool displayDirty = true;
+
+void updateButtons() {
+  for (int i = 0; i < 4; i++) {
+    pressedEvent[i] = false;
+
+    bool pressedNow = (digitalRead(BUTTON_PINS[i]) == LOW);
+
+    if (pressedNow != rawState[i]) {
+      rawState[i] = pressedNow;
+      lastChangeMs[i] = millis();
+    }
+
+    if ((millis() - lastChangeMs[i] >= DEBOUNCE_MS) && (rawState[i] != stableState[i])) {
+      stableState[i] = rawState[i];
+      if (stableState[i]) {
+        pressedEvent[i] = true;
+        beep(2000, 30);
+        Serial.printf("Button %d pressed\n", i + 1);
+      }
+    }
+  }
+}
+
+void updateClock() {
+  while (millis() - lastTickMs >= 1000) {
+    lastTickMs += 1000;
+    seconds++;
+    if (seconds >= 60) {
+      seconds = 0;
+      minutes++;
+      if (minutes >= 60) {
+        minutes = 0;
+        hours++;
+        if (hours >= 24) {
+          hours = 0;
+        }
+      }
+    }
+    displayDirty = true;
+  }
+}
+
+void enterSetTime() {
+  editHours = hours;
+  editMinutes = minutes;
+  editField = 0;
+  currentMode = MODE_SET_TIME;
+  tft.fillScreen(ST77XX_BLACK);
+  displayDirty = true;
+}
+
+void exitSetTime() {
+  hours = editHours;
+  minutes = editMinutes;
+  seconds = 0;
+  lastTickMs = millis();
+  currentMode = MODE_CLOCK;
+  tft.fillScreen(ST77XX_BLACK);
+  displayDirty = true;
+  beep(1000, 150);
+}
+
+void handleClockMode() {
+  if (pressedEvent[BTN_SET]) {
+    enterSetTime();
+  }
+}
+
+void handleSetTimeMode() {
+  if (pressedEvent[BTN_MODE]) {
+    editField = (editField + 1) % 2;
+    displayDirty = true;
+  }
+  if (pressedEvent[BTN_UP]) {
+    if (editField == 0) {
+      editHours = (editHours + 1) % 24;
+    } else {
+      editMinutes = (editMinutes + 1) % 60;
+    }
+    displayDirty = true;
+  }
+  if (pressedEvent[BTN_DOWN]) {
+    if (editField == 0) {
+      editHours = (editHours + 23) % 24;
+    } else {
+      editMinutes = (editMinutes +59) % 60;
+    }
+    displayDirty = true;
+  }
+  if (pressedEvent[BTN_SET]) {
+    exitSetTime();
+  }
+}
+
+void drawTwoDigits(int x, int y, int value, uint16_t color) {
+  char buf[3];
+  snprintf(buf, sizeof(buf), "%02d", value);
+  tft.setTextColor(color, ST77XX_BLACK);
+  tft.setCursor(x, y);
+  tft.print(buf);
+}
+
+void drawScreen() {
+  tft.setTextSize(2);
+  tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+  tft.setCursor(0, 4);
+  if (currentMode == MODE_CLOCK) {
+    tft.print("TIME      ");
+  } else if (editField == 0) {
+    tft.print("SET HOUR  ");
+  } else {
+    tft.print("SET MINUTE");
+  }
+
+  int showH, showM, showS;
+  uint16_t hourColor = ST77XX_WHITE;
+  uint16_t minColor = ST77XX_WHITE;
+
+  if (currentMode == MODE_CLOCK) {
+    showH = hours;
+    showM = minutes;
+    showS = seconds;
+  } else {
+    showH = editHours;
+    showM = editMinutes;
+    showS = 0;
+    if (editField == 0) {
+      hourColor = ST77XX_YELLOW;
+    } else {
+      minColor = ST77XX_YELLOW;
+    }
+  }
+
+  tft.setTextSize(5);
+  const int Y = 30;
+  drawTwoDigits(22, Y, showH, hourColor);
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  tft.setCursor(82, Y);
+  tft.print(":");
+  drawTwoDigits(112, Y, showM, minColor);
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  tft.setCursor(172, Y);
+  tft.print(":");
+  drawTwoDigits(202, Y, showS, ST77XX_WHITE);
+}
+
 
 void setup() {
   Serial.begin(115200);
   delay(2000);
   Serial.println("Booting...");
 
-  pinMode(SWITCH_PIN_1, INPUT_PULLUP);
-  pinMode(SWITCH_PIN_2, INPUT_PULLUP);
-  pinMode(SWITCH_PIN_3, INPUT_PULLUP);
-  pinMode(SWITCH_PIN_4, INPUT_PULLUP);
+  for (int i = 0; i < 4; i++) {
+    pinMode(BUTTON_PINS[i], INPUT_PULLUP);
+  }
   
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(TFT_BL, OUTPUT);
@@ -54,71 +240,21 @@ void setup() {
   tft.fillScreen(ST77XX_BLACK); 
   Serial.println("TFT Initialized!");
   
-  tft.setTextColor(ST77XX_WHITE);
-  tft.setTextSize(3);         
-  tft.setCursor(0, 0);
-  tft.print("Thing");
+  lastTickMs = millis();
 }
 
 void loop() {
-  int switch1State = digitalRead(SWITCH_PIN_1);
-  int switch2State = digitalRead(SWITCH_PIN_2);
-  int switch3State = digitalRead(SWITCH_PIN_3);
-  int switch4State = digitalRead(SWITCH_PIN_4);
+  updateButtons();
+  updateBeep();
+  updateClock();
 
-  int states[4] = {switch1State, switch2State, switch3State, switch4State};
-  for (int i = 0; i < 4; i++) {
-    if (states[i] != lastState[i]) {
-      Serial.printf("Switch %d %s\n", i + 1, states[i] == LOW ? "PRESSED" : "released");
-      lastState[i] = states[i];
-    }
+  switch (currentMode) {
+    case MODE_CLOCK:    handleClockMode();    break;
+    case MODE_SET_TIME: handleSetTimeMode();  break;
   }
 
-  if (switch1State == LOW && switch4State == LOW) {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0);
-    tft.print("Hi");
-    tone(BUZZER_PIN, 500);
-    delay(300);
-    noTone(BUZZER_PIN);
-  }
-  else if (switch1State == LOW) {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0);
-    tft.print("Switch 1 works");
-    tone(BUZZER_PIN, 1000);
-    delay(200);
-    noTone(BUZZER_PIN);
-  }
-  else if (switch2State == LOW) {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0);
-    tft.print("Switch 2 works");
-    tone(BUZZER_PIN, 500);
-    delay(500);
-    tone(BUZZER_PIN, 1000);
-    delay(200);
-    noTone(BUZZER_PIN);
-  }
-  else if (switch3State == LOW) {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0);
-    tft.print("Switch 3 works");
-    delay(200);
-    for (int i = 0; i < 5; i++) {
-      tft.fillScreen(ST77XX_RED);
-      tft.setCursor(0, 0);
-      tft.print("Iteration " + String(i));
-      // Syntax error corrected here:
-      tone(BUZZER_PIN, 200 * i + 200); 
-      delay(300);
-      noTone(BUZZER_PIN);
-    }
-  }
-  else if (switch4State == LOW) {
-    tft.fillScreen(ST77XX_BLACK);
-    tft.setCursor(0, 0);
-    tft.print("Switch 4 works");
-    delay(200);
+  if (displayDirty) {
+    drawScreen();
+    displayDirty = false;
   }
 }
