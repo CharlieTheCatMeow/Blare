@@ -39,16 +39,18 @@ unsigned long lastChangeMs[4] = {0, 0, 0, 0};
 bool pressedEvent[4] = {false, false, false, false};
 
 bool beepActive = false;
-unsigned long beepEndMs = 0;
+unsigned long beepStartMs = 0;
+unsigned long beepDurationMs = 0;
 
-void beep(int frequency, int durationMs) {
+void beep(int frequency, unsigned long durationMs) {
   tone(BUZZER_PIN, frequency);
   beepActive = true;
-  beepEndMs = millis() + durationMs;
+  beepStartMs = millis();
+  beepDurationMs = durationMs;
 }
 
 void updateBeep() {
-  if (beepActive && millis() >= beepEndMs) {
+  if (beepActive && (millis() - beepStartMs >= beepDurationMs)) {
     noTone(BUZZER_PIN);
     beepActive = false;
   }
@@ -105,7 +107,9 @@ void updateClock() {
         }
       }
     }
-    displayDirty = true;
+    if (currentMode == MODE_CLOCK) {
+      displayDirty = true;
+    }
   }
 }
 
@@ -119,10 +123,12 @@ void enterSetTime() {
 }
 
 void exitSetTime() {
-  hours = editHours;
-  minutes = editMinutes;
-  seconds = 0;
-  lastTickMs = millis();
+  if (editHours != hours || editMinutes != minutes) {
+    hours = editHours;
+    minutes = editMinutes;
+    seconds = 0;
+    lastTickMs = millis();
+  }
   currentMode = MODE_CLOCK;
   tft.fillScreen(ST77XX_BLACK);
   displayDirty = true;
